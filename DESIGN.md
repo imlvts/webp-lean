@@ -48,6 +48,39 @@ C init: `initialize_webp_WebP(uint8_t builtin)` (root module; Lean 4.35 naming `
 preceded by `lean_initialize_runtime_module()` and followed by `lean_io_mark_end_initialization()`.
 Static lib: `lake build WebP:static` -> `webp-lean/.lake/build/lib/libwebp_WebP.a`, plus toolchain `lib/lean/libleanrt.a libInit.a libStd.a`, plus `libc++`, `libgmp`, `libuv` from the toolchain's `lib/`.
 
+## Metadata (`WebP.info`, module `WebP.Info`)
+
+```lean
+@[export webp_lean_info_impl]
+def infoFFI (data : ByteArray) : ByteArray   -- data is OWNED (consumed)
+```
+
+Parses the container and the bitstream headers only (VP8L header; VP8 frame header + first
+partition headers), never pixel data. Proven to agree with `WebP.decode` on every file the
+decoder accepts (`WebP.Proofs.info_of_decode`). Result (little-endian):
+
+```
+u8  status        0 = ok, 1 = invalid (remaining bytes: UTF-8 error message)
+u32 canvas_width
+u32 canvas_height
+u8  flags         bit0 animated, bit1 has_alpha, bit2 lossy, bit3 extended (VP8X),
+                  bit4 ICCP present, bit5 EXIF present, bit6 XMP present
+u16 loop_count
+u32 background_color   (raw ANIM value; 0 if none)
+u32 iccp_offset, u32 iccp_size   (payload offset/size in the input; 0 if absent)
+u32 exif_offset, u32 exif_size
+u32 xmp_offset,  u32 xmp_size
+u32 num_frames         (a still image is one frame at (0,0), duration 0)
+repeated num_frames times (21 bytes):
+  u32 x, u32 y, u32 width, u32 height, u32 duration_ms
+  u8  flags       bit0 alpha-blend, bit1 dispose to background, bit2 lossy,
+                  bit3 has_alpha (lossy: ALPH chunk present; lossless: alpha_is_used hint)
+```
+
+C API wrapping it: `webp-lean/c/webp_lean.h` (`webp_lean_get_info`, `webp_lean_info_free`);
+`webp-lean/c/build.sh` builds the example `webp_lean_info` (link: `libwebp_WebP.a` +
+`-lleanshared`; init via `initialize_webp_WebP_FFI`).
+
 ## VP8 (lossy) Lean API (module `WebP.VP8`)
 
 ```lean

@@ -7,7 +7,8 @@ def writePAM (path : String) (w h : Nat) (rgba : ByteArray) : IO Unit := do
 
 def usage : String :=
   "usage: webp-lean decode <in.webp> <out-prefix>   (writes <out-prefix>.pam or <out-prefix>.<n>.pam)\n" ++
-  "       webp-lean info <in.webp>"
+  "       webp-lean info <in.webp>     (metadata, without decoding pixels)\n" ++
+  "       webp-lean layout <in.webp>   (demuxed container layout)"
 
 def main (args : List String) : IO UInt32 := do
   match args with
@@ -22,6 +23,11 @@ def main (args : List String) : IO UInt32 := do
       | fs => for ((_, c), i) in fs.zipIdx do writePAM s!"{out}.{i}.pam" o.width o.height c
       pure 0
   | ["info", inp] =>
+    let d ← IO.FS.readBinFile inp
+    match WebP.info d with
+    | .error e => IO.println s!"error: {e}"; pure 1
+    | .ok i => IO.println (repr i); pure 0
+  | ["layout", inp] =>
     let d ← IO.FS.readBinFile inp
     match Container.demux d with
     | .error e => IO.println s!"demux error: {e}"; pure 1

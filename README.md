@@ -11,7 +11,9 @@ webp-lean/           Lean 4 (v4.35.0, core only, no Mathlib)
   WebP/Alpha         alpha unfiltering  │
   WebP/VP8, VP8/*    lossy (VP8) decoder┘ (= Spec.VP8 with a proven one-shift boolean decoder)
   WebP/VP8Libwebp/*  old libwebp-mimic VP8 decoder (differential model of libwebp; not shipped)
-  WebP/Decode, FFI   top level + C entry point for the fuzzer
+  WebP/Decode, FFI   top level + C entry points (decoder for the fuzzer, metadata)
+  WebP/Info          file metadata without decoding pixels
+  c/                 C API for the metadata (webp_lean.h) + example; build with c/build.sh
   WebP/Proofs/*      proofs: decoder = spec
 build/dixie/         RFC 6386 reference decoder extracted from the RFC text, driver, validation
 fuzz/                differential fuzzer: Lean vs libwebp (2 APIs) vs image-webp  (see fuzz/README.md)
@@ -24,7 +26,8 @@ Build and check everything: `cd webp-lean && lake build` (all proofs are checked
 build; there is no `sorry`, `axiom` or `native_decide`; every decoder theorem depends only on
 Lean's standard axioms `propext`, `Classical.choice`, `Quot.sound` — the one sanity lemma
 `addGreen_subtractGreen` uses `bv_decide`, i.e. a checked SAT certificate). CLI: `webp-lean decode in.webp out`
-(writes PAM), `webp-lean info in.webp` (prints the demuxed layout).
+(writes PAM), `webp-lean info in.webp` (metadata, without decoding pixels),
+`webp-lean layout in.webp` (prints the demuxed layout).
 
 ## The specification (`WebP/Spec`)
 
@@ -91,6 +94,10 @@ Application-defined choices: transparent-black background, sRGB-space blending r
   and for the exact function the fuzzer calls: `ffi_sound`, `ffi_complete` (within its resource limit), `ffi_invalid`.
 * The same with the concrete lossy semantics: `decode_iff' : WebP.decode d = .ok out ↔
   Spec.Decodes Spec.lossy d out`, `decodes_unique'`, `ffi_sound'`, `ffi_complete'`, `ffi_invalid'`.
+* `Proofs.Info.info_of_decode`: if `WebP.decode d = .ok o` then `WebP.info d = .ok i` with the same
+  canvas size, animated/alpha/lossy flags, loop count, background and frame durations
+  (`info_of_decodes` for `Spec.Decodes Spec.lossy`); `info_wellFormed`: `info` only accepts files
+  satisfying `Spec.Demux`. (`info` may accept files whose pixel data is corrupt.)
 * `Proofs.SpecFacts`: sanity checks of the spec against RFC sentences (`ReadBits(2)` example, distance codes, subtract-green inverse).
 
 The lossy decoder is now proven equal to the RFC 6386 transcription. What remains trusted: that

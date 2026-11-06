@@ -1,4 +1,5 @@
 import WebP.Decode
+import WebP.Info
 /-!
 # FFI entry point used by the differential fuzzer (wire format: ../DESIGN.md)
 -/
@@ -64,5 +65,36 @@ def decodeFFI (data : ByteArray) (maxPixels : UInt64) : ByteArray :=
   match decodeChecked data maxPixels.toNat with
   | .ok o => serialize o
   | .error (s, e) => errorResult s e
+
+/-- Metadata wire format (../DESIGN.md, "Metadata"). -/
+def serializeInfo (i : Info) : ByteArray := Id.run do
+  let bit (b : Bool) (k : Nat) : Nat := if b then 2 ^ k else 0
+  let mut b := ByteArray.mk #[0]
+  b := pushLE b i.width 4
+  b := pushLE b i.height 4
+  b := b.push (bit i.animated 0 + bit i.hasAlpha 1 + bit i.lossy 2 + bit i.extended 3 +
+    bit i.iccp.isSome 4 + bit i.exif.isSome 5 + bit i.xmp.isSome 6).toUInt8
+  b := pushLE b i.loopCount 2
+  b := pushLE b i.background 4
+  for c in [i.iccp, i.exif, i.xmp] do
+    let (off, size) := match c with | some c => (c.off, c.size) | none => (0, 0)
+    b := pushLE b off 4
+    b := pushLE b size 4
+  b := pushLE b i.frames.length 4
+  for f in i.frames do
+    b := pushLE b f.x 4
+    b := pushLE b f.y 4
+    b := pushLE b f.width 4
+    b := pushLE b f.height 4
+    b := pushLE b f.duration 4
+    b := b.push (bit f.blend 0 + bit f.dispose 1 + bit f.lossy 2 + bit f.hasAlpha 3).toUInt8
+  return b
+
+/-- File metadata without decoding pixel data (`WebP.info`). Takes ownership of `data`. -/
+@[export webp_lean_info_impl]
+def infoFFI (data : ByteArray) : ByteArray :=
+  match WebP.info data with
+  | .ok i => serializeInfo i
+  | .error e => errorResult 1 e
 
 end WebP.FFI
