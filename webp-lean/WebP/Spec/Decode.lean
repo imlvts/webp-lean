@@ -43,10 +43,12 @@ structure Components where
   vp8lStream : ByteArray → Nat → Nat → Except String (Array UInt32)
   /-- Alpha unfiltering (§2.7.1.2): method, width, height, filtered plane. -/
   unfilter : Nat → Nat → Nat → ByteArray → ByteArray
+  /-- Canvas assembly (§2.7.2): canvas width, height, decoded frames → canvas after each. -/
+  compose : Nat → Nat → List (FrameInfo × ByteArray) → List ByteArray
 
 /-- The reference components, given a VP8 decoder. -/
 def specComponents (vp8 : ByteArray → Except String RGBAImage) : Components :=
-  ⟨vp8, VP8L.decode, VP8L.decodeStream, Alpha.unfilter⟩
+  ⟨vp8, VP8L.decode, VP8L.decodeStream, Alpha.unfilter, Anim.compose⟩
 
 /-- Result of decoding: canvas size, flags, and the canvas after each frame. -/
 structure Output where
@@ -125,7 +127,7 @@ def decodeLayout (C : Components) (d : ByteArray) : Layout → Except String Out
       [(0, img.data)]⟩
   | .animated x bg loops frames => do
     let decoded ← decodeFrames C d frames
-    let canvases := Anim.compose x.canvasWidth x.canvasHeight decoded
+    let canvases := C.compose x.canvasWidth x.canvasHeight decoded
     return ⟨x.canvasWidth, x.canvasHeight, true, x.alpha, frames.any isLossyFrame, loops, bg,
       (frames.map (·.duration)).zip canvases⟩
 

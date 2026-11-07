@@ -3,6 +3,7 @@ import WebP.Proofs.Alpha
 import WebP.Proofs.Container
 import WebP.FFI
 import WebP.Proofs.VP8
+import WebP.Proofs.Anim
 /-!
 # End-to-end: the decoder implements the WebP semantics
 
@@ -23,7 +24,7 @@ open WebP WebP.Spec
 theorem implComponents_eq (vp8 : ByteArray → Except String RGBAImage) :
     implComponents vp8 = specComponents vp8 := by
   unfold implComponents specComponents
-  rw [vp8l_decode_eq, vp8l_decodeStream_eq, unfilter_eq]
+  rw [vp8l_decode_eq, vp8l_decodeStream_eq, unfilter_eq, compose_eq]
 
 /-- **The decoder computes exactly the specified semantics** (relative to the VP8 decoder). -/
 theorem decodeWith_iff (vp8 : ByteArray → Except String RGBAImage) (d : ByteArray)

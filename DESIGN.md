@@ -10,6 +10,7 @@ Layout (all under /var/data/diff-fuzz/webp):
   - `WebP/Spec/*.lean`         formal spec of RFC 9649 (container grammar, VP8L, ALPH, animation).
   - `WebP/Container/*.lean`    RIFF/WebP demuxer.
   - `WebP/VP8L/*.lean`         lossless decoder.
+  - `WebP/Anim.lean`           in-place animation canvas assembly (= `Spec.Anim.compose`, proven).
   - `WebP/Spec/VP8/*.lean`     RFC 6386 key-frame decoding (transcription of the reference decoder) + YUV->RGBA.
   - `WebP/VP8.lean`, `WebP/VP8/*.lean`  shipped lossy decoder (= spec with optimized primitives, proven).
   - `WebP/VP8Libwebp/*.lean`   old libwebp-mimic VP8 decoder (model of libwebp, used by `vp8-check ... libwebp`).

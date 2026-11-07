@@ -87,13 +87,13 @@ theorem bitstreamHeader_of_decodeImage (d : ByteArray) (alph : Option Chunk) (bi
         hdim.2]
 
 theorem compose_go_length (W : Nat) : ∀ (canvas : ByteArray) (prev : Option FrameInfo)
-    (l : List (FrameInfo × ByteArray)), (Anim.compose.go W canvas prev l).length = l.length
+    (l : List (FrameInfo × ByteArray)), (Spec.Anim.compose.go W canvas prev l).length = l.length
   | _, _, [] => rfl
   | canvas, prev, (f, img) :: rest => by
-    simp only [Anim.compose.go, List.length_cons, compose_go_length]
+    simp only [Spec.Anim.compose.go, List.length_cons, compose_go_length]
 
 theorem compose_length (W H : Nat) (l : List (FrameInfo × ByteArray)) :
-    (Anim.compose W H l).length = l.length := compose_go_length W _ _ l
+    (Spec.Anim.compose W H l).length = l.length := compose_go_length W _ _ l
 
 theorem animFrames_of_decodeFrames (d : ByteArray) : ∀ (frames : List FrameInfo)
     (dec : List (FrameInfo × ByteArray)),
@@ -172,7 +172,7 @@ theorem infoOfLayout_of_decodeLayout (d : ByteArray) (L : Layout) (o : Output)
       refine ⟨_, rfl, ?_⟩
       constructor <;> try rfl
       simp only
-      rw [List.map_fst_zip (by simp [compose_length, hlen]), hdur]
+      rw [List.map_fst_zip (by simp [specComponents, compose_length, hlen]), hdur]
 
 /-- **Metadata agrees with decoding**: whenever the decoder succeeds, `info` succeeds and
 reports the same canvas size, flags, loop count, background color and frame durations. -/

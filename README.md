@@ -9,6 +9,7 @@ webp-lean/           Lean 4 (v4.35.0, core only, no Mathlib)
   WebP/Container/*   demuxer            ┐
   WebP/VP8L/Fast     lossless decoder   │ the decoder
   WebP/Alpha         alpha unfiltering  │
+  WebP/Anim          canvas assembly    │ (in place, frame rectangles only)
   WebP/VP8, VP8/*    lossy (VP8) decoder┘ (= Spec.VP8 with a proven one-shift boolean decoder)
   WebP/VP8Libwebp/*  old libwebp-mimic VP8 decoder (differential model of libwebp; not shipped)
   WebP/Decode, FFI   top level + C entry points (decoder for the fuzzer, metadata)
@@ -84,6 +85,8 @@ Application-defined choices: transparent-black background, sRGB-space blending r
 * `Proofs.Prefix.fastBuild_eq : VP8L.fastBuild = Spec.Prefix.build` — table + bit-by-bit canonical decoding equals codeword search.
 * `Proofs.Lossless.vp8l_decode_eq : VP8L.decode = Spec.VP8L.decode` (and for headerless ALPH streams).
 * `Proofs.Alpha.unfilter_eq : Alpha.unfilter = Spec.Alpha.unfilter` — in-place one-pass unfiltering equals the declarative equations.
+* `Proofs.Anim.compose_eq : WebP.Anim.compose = Spec.Anim.compose` — in-place canvas assembly that
+  touches only each frame's rectangle equals the pointwise per-byte definition.
 * `Proofs.Container.demux_iff : Container.demux d = .ok L ↔ Spec.Demux d L` — demuxer sound and complete for the grammar.
 * `Proofs.VP8Bool.fastBoolGet_eq : VP8.fastBoolGet = Spec.VP8.boolGet` — the boolean decoder that
   renormalizes with one shift equals dixie's bit-at-a-time `bool_get` on all states.

@@ -12,6 +12,7 @@ import WebP.VP8L.Fast
 import WebP.Alpha
 import WebP.VP8
 import WebP.VP8Libwebp
+import WebP.Anim
 import WebP.Decode
 import WebP.Info
 import WebP.FFI
@@ -23,5 +24,6 @@ import WebP.Proofs.Container
 import WebP.Proofs.SpecFacts
 import WebP.Proofs.VP8Bool
 import WebP.Proofs.VP8
+import WebP.Proofs.Anim
 import WebP.Proofs.Decode
 import WebP.Proofs.Info

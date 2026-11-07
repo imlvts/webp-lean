@@ -3,6 +3,7 @@ import WebP.Container.Demux
 import WebP.VP8L.Fast
 import WebP.Alpha
 import WebP.VP8
+import WebP.Anim
 /-!
 # The WebP decoder
 
@@ -19,7 +20,7 @@ def vp8Decode (d : ByteArray) : Except String RGBAImage :=
 
 /-- The optimized components, parametric in the VP8 decoder. -/
 def implComponents (vp8 : ByteArray → Except String RGBAImage) : Spec.Components :=
-  ⟨vp8, VP8L.decode, VP8L.decodeStream, Alpha.unfilter⟩
+  ⟨vp8, VP8L.decode, VP8L.decodeStream, Alpha.unfilter, Anim.compose⟩
 
 /-- **The decoder**, parametric in the VP8 decoder. -/
 def decodeWith (vp8 : ByteArray → Except String RGBAImage) (d : ByteArray) :
