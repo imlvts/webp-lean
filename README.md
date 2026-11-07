@@ -15,6 +15,7 @@ webp-lean/           Lean 4 (v4.35.0, core only, no Mathlib)
   WebP/Decode, FFI   top level + C entry points (decoder for the fuzzer, metadata)
   WebP/Info          file metadata without decoding pixels
   c/                 C API for the metadata (webp_lean.h) + example; build with c/build.sh
+  c/stackcheck/      stack-safety check (recursion audit + deep-input stress), run.sh
   WebP/Proofs/*      proofs: decoder = spec
 build/dixie/         RFC 6386 reference decoder extracted from the RFC text, driver, validation
 fuzz/                differential fuzzer: Lean vs libwebp (2 APIs) vs image-webp  (see fuzz/README.md)
@@ -105,7 +106,11 @@ Application-defined choices: transparent-black background, sRGB-space blending r
   `Container.parseFrames`, `Spec.decodeFrames`, `WebP.animFrames` and core's `List.zip` are
   compiled as tail-recursive twins through proven `@[csimp]` equations (`parseChunks_eq_parseChunksTR`,
   …, `zip_eq_zipTR`); `WebP.Anim.compose` accumulates directly. The proofs above reason about
-  the plain definitions. Checked with 1M chunks / 1M frames on a 256 KiB thread stack.
+  the plain definitions. `webp-lean/c/stackcheck/run.sh` checks this: it audits the emitted C
+  for recursion not compiled to a loop (reachable from the FFI exports and the CLI; only the
+  bounded `Anim.zeros` and `Spec.le` remain) and decodes 1M chunks / 1M frames and 4096x4096
+  images on a 256 KiB thread stack. The CLI prints input lists one item per line (`repr` of a
+  whole list pretty-prints recursively).
 * `Proofs.SpecFacts`: sanity checks of the spec against RFC sentences (`ReadBits(2)` example, distance codes, subtract-green inverse).
 
 The lossy decoder is now proven equal to the RFC 6386 transcription. What remains trusted: that
