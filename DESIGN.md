@@ -68,7 +68,8 @@ u8  flags         bit0 animated, bit1 has_alpha, bit2 lossy, bit3 extended (VP8X
                   bit4 ICCP present, bit5 EXIF present, bit6 XMP present
 u16 loop_count
 u32 background_color   (raw ANIM value; 0 if none)
-u32 iccp_offset, u32 iccp_size   (payload offset/size in the input; 0 if absent)
+u32 iccp_offset, u32 iccp_size   (payload offset/size in the input; 0 if absent;
+                                  offset + size < 2^32: `WebP.Proofs.info_chunk_end`)
 u32 exif_offset, u32 exif_size
 u32 xmp_offset,  u32 xmp_size
 u32 num_frames         (a still image is one frame at (0,0), duration 0)

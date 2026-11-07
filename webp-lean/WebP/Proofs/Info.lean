@@ -8,6 +8,8 @@ import WebP.Info
   durations as `o` (`InfoMatches i o`).
 * `info_of_decodes`: the same for the semantics `Spec.Decodes Spec.lossy`.
 * `info_wellFormed`: `info` only accepts well-formed containers (`Spec.Demux`).
+* `info_chunk_end`: the reported 'ICCP'/'EXIF'/'XMP ' chunks end below `2 ^ 32`, so they fit
+  the 32-bit fields of the metadata wire format.
 -/
 namespace WebP.Proofs
 
@@ -209,5 +211,86 @@ theorem info_wellFormed (d : ByteArray) (i : Info) (h : WebP.info d = .ok i) :
   cases hL : Container.demux d with
   | error e => simp [hL, bind, Except.bind] at h
   | ok L => exact ⟨L, (demux_iff d L).mp hL⟩
+
+/-! ## Metadata chunks fit the 32-bit wire format -/
+
+/-- Every chunk `parseChunks` returns ends within `stop`. -/
+theorem parseChunks_end (d : ByteArray) (stop : Nat) : ∀ n p cs, stop - p ≤ n →
+    Container.parseChunks d p stop = .ok cs → ∀ c ∈ cs, c.off + c.size ≤ stop := by
+  intro n
+  induction n with
+  | zero =>
+    intro p cs hn h c hc
+    rw [Container.parseChunks] at h
+    by_cases h1 : p = stop
+    · simp only [h1, ite_true, Except.ok.injEq] at h; subst h; simp at hc
+    · have h2 : stop < p + 8 := by omega
+      simp [h1, h2] at h
+  | succ n ih =>
+    intro p cs hn h c hc
+    rw [Container.parseChunks] at h
+    by_cases h1 : p = stop
+    · simp only [h1, ite_true, Except.ok.injEq] at h; subst h; simp at hc
+    by_cases h2 : stop < p + 8
+    · simp [h1, h2] at h
+    by_cases h3 : stop < p + 8 + u32 d (p + 4) + u32 d (p + 4) % 2
+    · simp [h1, h2, h3] at h
+    simp only [h1, h2, h3, ite_false] at h
+    split at h
+    · rename_i cs' hr
+      injection h with h
+      subst h
+      rcases List.mem_cons.1 hc with rfl | hc
+      · simp only []; omega
+      · exact ih _ _ (by omega) hr c hc
+    · cases h
+
+/-- Every top-level chunk ends below `2 ^ 32 - 1`. -/
+theorem parseRiff_end (d : ByteArray) (cs : List Chunk) (h : Container.parseRiff d = .ok cs) :
+    ∀ c ∈ cs, c.off + c.size ≤ 2 ^ 32 - 2 := by
+  unfold Container.parseRiff at h
+  split at h
+  · dsimp only at h
+    split at h
+    · rename_i hs
+      intro c hc
+      have := parseChunks_end d _ _ 12 cs (Nat.le_refl _) h c hc
+      omega
+    · cases h
+  · cases h
+
+/-- The 'ICCP', 'EXIF' and 'XMP ' chunks `info` reports have offset and end below `2 ^ 32`,
+so the 32-bit fields of the metadata wire format (`FFI.serializeInfo`) never wrap. -/
+theorem info_chunk_end (d : ByteArray) (i : Info) (h : WebP.info d = .ok i) (c : Chunk)
+    (hc : i.iccp = some c ∨ i.exif = some c ∨ i.xmp = some c) : c.off + c.size < 2 ^ 32 := by
+  have hnone : ∀ L i, infoOfLayout d L = .ok i → i.iccp = none ∧ i.exif = none ∧ i.xmp = none := by
+    intro L i h
+    unfold infoOfLayout at h
+    split at h <;> simp only [bind, Except.bind, pure, Except.pure] at h <;> (repeat' split at h) <;>
+      (cases h <;> simp)
+  unfold WebP.info at h
+  cases hL : Container.demux d with
+  | error e => simp [hL, bind, Except.bind] at h
+  | ok L =>
+    simp only [hL, bind, Except.bind] at h
+    cases hi : infoOfLayout d L with
+    | error e => simp [hi] at h
+    | ok i' =>
+      simp only [hi] at h
+      have hn := hnone L i' hi
+      split at h
+      · cases hcs : Container.parseRiff d with
+        | error e => simp [hcs] at h
+        | ok cs =>
+          simp only [hcs, pure, Except.pure, Except.ok.injEq] at h
+          subst h
+          have hmem : c ∈ cs := by
+            simp only [findChunk] at hc
+            rcases hc with hc | hc | hc <;> exact List.mem_of_find?_eq_some hc
+          have := parseRiff_end d cs hcs c hmem
+          omega
+      · simp only [pure, Except.pure, Except.ok.injEq] at h
+        subst h
+        rcases hc with hc | hc | hc <;> simp_all
 
 end WebP.Proofs

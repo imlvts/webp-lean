@@ -1,5 +1,6 @@
 // Initializes the Lean runtime once and wraps the exported Lean decoder (see ../../DESIGN.md).
 #include <lean/lean.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,10 +10,9 @@ extern lean_object* initialize_webp_WebP(uint8_t builtin);
 extern void lean_initialize_runtime_module(void);
 extern void lean_io_mark_end_initialization(void);
 
-static int g_lean_initialized = 0;
+static pthread_once_t g_lean_once = PTHREAD_ONCE_INIT;
 
-void webp_lean_init(void) {
-  if (g_lean_initialized) return;
+static void lean_init_once(void) {
   lean_initialize_runtime_module();
   lean_set_panic_messages(true);
   // A Lean `panic!` (e.g. out-of-bounds `get!`) is a decoder bug: make it fatal.
@@ -26,8 +26,10 @@ void webp_lean_init(void) {
     abort();
   }
   lean_io_mark_end_initialization();
-  g_lean_initialized = 1;
 }
+
+// Thread-safe: concurrent first calls initialize once, and all return after it finishes.
+void webp_lean_init(void) { pthread_once(&g_lean_once, lean_init_once); }
 
 // Decodes `data`; result bytes (wire format of DESIGN.md) are malloc'ed into *out.
 size_t webp_lean_decode(const uint8_t* data, size_t len, uint64_t max_pixels, uint8_t** out) {
