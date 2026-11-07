@@ -16,6 +16,10 @@ static pthread_once_t g_once = PTHREAD_ONCE_INIT;
 
 static void init_once(void) {
   lean_initialize_runtime_module();
+  // No reachable Lean code panics; if one ever does, it is a bug: abort instead of
+  // continuing with a default value.
+  lean_set_panic_messages(true);
+  lean_set_exit_on_panic(true);
   lean_object* res = initialize_webp_WebP_FFI(1);
   if (!lean_io_result_is_ok(res)) {
     lean_io_result_show_error(res);
