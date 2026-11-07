@@ -77,16 +77,17 @@ def disposeFrame (W : Nat) (canvas : ByteArray) (f : FrameInfo) : ByteArray :=
 
 /-- **Canvas assembly** (`= Spec.Anim.compose`). -/
 def compose (W H : Nat) (frames : List (FrameInfo × ByteArray)) : List ByteArray :=
-  go (zeros (W * H * 4)) none frames
+  go (zeros (W * H * 4)) none frames []
 where
+  /-- Tail-recursive: `acc` holds the canvases so far, most recent first. -/
   go (canvas : ByteArray) (prev : Option FrameInfo) :
-      List (FrameInfo × ByteArray) → List ByteArray
-    | [] => []
-    | (f, img) :: rest =>
+      List (FrameInfo × ByteArray) → List ByteArray → List ByteArray
+    | [], acc => acc.reverse
+    | (f, img) :: rest, acc =>
       let disposed := match prev with
         | some p => if p.dispose then disposeFrame W canvas p else canvas
         | none => canvas
       let shown := renderFrame W disposed f img
-      shown :: go shown (some f) rest
+      go shown (some f) rest (shown :: acc)
 
 end WebP.Anim

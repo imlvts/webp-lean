@@ -101,6 +101,11 @@ Application-defined choices: transparent-black background, sRGB-space blending r
   canvas size, animated/alpha/lossy flags, loop count, background and frame durations
   (`info_of_decodes` for `Spec.Decodes Spec.lossy`); `info_wellFormed`: `info` only accepts files
   satisfying `Spec.Demux`. (`info` may accept files whose pixel data is corrupt.)
+* Stack safety of the compiled code: the per-chunk/per-frame recursions `Container.parseChunks`,
+  `Container.parseFrames`, `Spec.decodeFrames`, `WebP.animFrames` and core's `List.zip` are
+  compiled as tail-recursive twins through proven `@[csimp]` equations (`parseChunks_eq_parseChunksTR`,
+  …, `zip_eq_zipTR`); `WebP.Anim.compose` accumulates directly. The proofs above reason about
+  the plain definitions. Checked with 1M chunks / 1M frames on a 256 KiB thread stack.
 * `Proofs.SpecFacts`: sanity checks of the spec against RFC sentences (`ReadBits(2)` example, distance codes, subtract-green inverse).
 
 The lossy decoder is now proven equal to the RFC 6386 transcription. What remains trusted: that

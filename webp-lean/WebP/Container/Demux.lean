@@ -4,6 +4,10 @@ import WebP.Spec.Container
 
 Executable parser for the container grammar `WebP.Spec.Demux`;
 `WebP.Proofs.Container` proves `demux d = .ok L ↔ Spec.Demux d L`.
+
+`parseChunks` and `parseFrames` recurse once per chunk/frame. Each has a tail-recursive twin
+(`…TR`) proven equal to it and registered with `@[csimp]`, so compiled code uses the twin and
+runs in constant stack space; proofs keep reasoning about the plain definitions.
 -/
 namespace WebP.Container
 
@@ -22,6 +26,58 @@ def parseChunks (d : ByteArray) (p stop : Nat) : Except String (List Chunk) :=
       | .ok cs => .ok (⟨u32 d p, p + 8, size⟩ :: cs)
       | .error e => .error e
 termination_by stop - p
+
+/-- `parseChunks` with an accumulator (chunks in reverse order). -/
+def parseChunksTR.go (d : ByteArray) (stop : Nat) (p : Nat) (acc : List Chunk) :
+    Except String (List Chunk) :=
+  if p = stop then .ok acc.reverse
+  else if stop < p + 8 then .error "truncated chunk header"
+  else
+    let size := u32 d (p + 4)
+    let next := p + 8 + size + size % 2
+    if stop < next then .error "chunk exceeds its container"
+    else go d stop next (⟨u32 d p, p + 8, size⟩ :: acc)
+termination_by stop - p
+
+def parseChunksTR (d : ByteArray) (p stop : Nat) : Except String (List Chunk) :=
+  parseChunksTR.go d stop p []
+
+theorem parseChunksTR_go_aux (d : ByteArray) (stop : Nat) : ∀ n p (acc : List Chunk),
+    stop - p ≤ n →
+    parseChunksTR.go d stop p acc = (parseChunks d p stop).map (acc.reverse ++ ·) := by
+  intro n
+  induction n with
+  | zero =>
+    intro p acc hn
+    rw [parseChunksTR.go]
+    conv => rhs; rw [parseChunks]
+    by_cases h1 : p = stop
+    · simp [h1, Except.map]
+    · have h2 : stop < p + 8 := by omega
+      simp [h1, h2, Except.map]
+  | succ n ih =>
+    intro p acc hn
+    rw [parseChunksTR.go]
+    conv => rhs; rw [parseChunks]
+    by_cases h1 : p = stop
+    · simp [h1, Except.map]
+    by_cases h2 : stop < p + 8
+    · simp [h1, h2, Except.map]
+    by_cases h3 : stop < p + 8 + u32 d (p + 4) + u32 d (p + 4) % 2
+    · simp [h1, h2, h3, Except.map]
+    · simp only [h1, h2, h3, ite_false]
+      rw [ih _ _ (by omega)]
+      cases parseChunks d (p + 8 + u32 d (p + 4) + u32 d (p + 4) % 2) stop <;>
+        simp [Except.map]
+
+theorem parseChunksTR_go (d : ByteArray) (stop p : Nat) (acc : List Chunk) :
+    parseChunksTR.go d stop p acc = (parseChunks d p stop).map (acc.reverse ++ ·) :=
+  parseChunksTR_go_aux d stop _ p acc (Nat.le_refl _)
+
+@[csimp] theorem parseChunks_eq_parseChunksTR : @parseChunks = @parseChunksTR := by
+  funext d p stop
+  rw [parseChunksTR, parseChunksTR_go]
+  cases parseChunks d p stop <;> simp [Except.map]
 
 /-- §2.4 header, returning the top-level chunks. -/
 def parseRiff (d : ByteArray) : Except String (List Chunk) :=
@@ -60,6 +116,33 @@ def parseFrames (d : ByteArray) : List Chunk → Except String (List FrameInfo)
     | .ok f, .ok fs => .ok (f :: fs)
     | .error e, _ => .error e
     | _, .error e => .error e
+
+/-- `parseFrames` with an accumulator: stops at the first invalid frame. -/
+def parseFramesTR.go (d : ByteArray) : List Chunk → List FrameInfo → Except String (List FrameInfo)
+  | [], acc => .ok acc.reverse
+  | c :: cs, acc =>
+    match parseFrame d c with
+    | .ok f => go d cs (f :: acc)
+    | .error e => .error e
+
+def parseFramesTR (d : ByteArray) (cs : List Chunk) : Except String (List FrameInfo) :=
+  parseFramesTR.go d cs []
+
+theorem parseFramesTR_go (d : ByteArray) : ∀ (cs : List Chunk) (acc : List FrameInfo),
+    parseFramesTR.go d cs acc = (parseFrames d cs).map (acc.reverse ++ ·)
+  | [], acc => by simp [parseFramesTR.go, parseFrames, Except.map]
+  | c :: cs, acc => by
+    simp only [parseFramesTR.go, parseFrames]
+    cases parseFrame d c with
+    | error e => simp [Except.map]
+    | ok f =>
+      simp only [parseFramesTR_go d cs (f :: acc)]
+      cases parseFrames d cs <;> simp [Except.map]
+
+@[csimp] theorem parseFrames_eq_parseFramesTR : @parseFrames = @parseFramesTR := by
+  funext d cs
+  rw [parseFramesTR, parseFramesTR_go]
+  cases parseFrames d cs <;> simp [Except.map]
 
 /-- §2.7 extended format, given the 'VP8X' chunk and the chunks after it. -/
 def parseExtended (d : ByteArray) (x : Chunk) (rest : List Chunk) : Except String Layout :=

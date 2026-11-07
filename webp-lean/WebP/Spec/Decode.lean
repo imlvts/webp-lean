@@ -106,6 +106,54 @@ def decodeFrames (C : Components) (d : ByteArray) :
     let rest ← decodeFrames C d fs
     return (f, img.data) :: rest
 
+/-! Compilation only: `decodeFrames` recurses once per frame, so compiled code uses the
+tail-recursive twin below (`@[csimp]`, proven equal); it does not change the semantics. -/
+
+def decodeFramesTR.go (C : Components) (d : ByteArray) :
+    List FrameInfo → List (FrameInfo × ByteArray) → Except String (List (FrameInfo × ByteArray))
+  | [], acc => .ok acc.reverse
+  | f :: fs, acc =>
+    match decodeImage C d f.alph f.bits with
+    | .error e => .error e
+    | .ok img =>
+      if img.width ≠ f.width ∨ img.height ≠ f.height then
+        .error "frame bitstream size differs from ANMF size"
+      else go C d fs ((f, img.data) :: acc)
+
+def decodeFramesTR (C : Components) (d : ByteArray) (fs : List FrameInfo) :
+    Except String (List (FrameInfo × ByteArray)) :=
+  decodeFramesTR.go C d fs []
+
+theorem decodeFramesTR_go (C : Components) (d : ByteArray) :
+    ∀ (fs : List FrameInfo) (acc : List (FrameInfo × ByteArray)),
+    decodeFramesTR.go C d fs acc = (decodeFrames C d fs).map (acc.reverse ++ ·)
+  | [], acc => by simp [decodeFramesTR.go, decodeFrames, Except.map]
+  | f :: fs, acc => by
+    simp only [decodeFramesTR.go, decodeFrames, bind, Except.bind]
+    cases decodeImage C d f.alph f.bits with
+    | error e => simp [Except.map]
+    | ok img =>
+      simp only []
+      split
+      · simp [Except.map, throw, throwThe, MonadExceptOf.throw]
+      · rw [decodeFramesTR_go C d fs]
+        cases decodeFrames C d fs <;> simp [Except.map, pure, Except.pure]
+
+@[csimp] theorem decodeFrames_eq_decodeFramesTR : @decodeFrames = @decodeFramesTR := by
+  funext C d fs
+  rw [decodeFramesTR, decodeFramesTR_go]
+  cases decodeFrames C d fs <;> simp [Except.map]
+
+/-- Core's compiled `List.zip` recurses once per element; route it to the tail-recursive
+`List.zipWithTR` (used by `decodeLayout` to pair frame durations with canvases). -/
+def zipTR.{u, v} {α : Type u} {β : Type v} (as : List α) (bs : List β) : List (α × β) :=
+  List.zipWithTR Prod.mk as bs
+
+@[csimp] theorem zip_eq_zipTR : @List.zip = @zipTR := by
+  funext α β as bs
+  rw [zipTR, ← List.zipWith_eq_zipWithTR]
+  rfl
+
 def isLossyFrame (f : FrameInfo) : Bool := f.bits.tag == VP8
 
 /-- Decode a demuxed file. -/

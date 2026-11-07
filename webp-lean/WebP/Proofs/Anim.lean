@@ -311,17 +311,17 @@ theorem disposeFrame_eq : WebP.Anim.disposeFrame = Spec.Anim.disposeFrame := by
     rfl
 
 theorem compose_go_eq (W : Nat) : ∀ (canvas : ByteArray) (prev : Option FrameInfo)
-    (l : List (FrameInfo × ByteArray)),
-    WebP.Anim.compose.go W canvas prev l = Spec.Anim.compose.go W canvas prev l
-  | _, _, [] => rfl
-  | canvas, prev, (f, img) :: rest => by
-    cases prev <;> simp only [WebP.Anim.compose.go, Spec.Anim.compose.go, renderFrame_eq,
+    (l : List (FrameInfo × ByteArray)) (acc : List ByteArray),
+    WebP.Anim.compose.go W canvas prev l acc = acc.reverse ++ Spec.Anim.compose.go W canvas prev l
+  | _, _, [], acc => by simp [WebP.Anim.compose.go, Spec.Anim.compose.go]
+  | canvas, prev, (f, img) :: rest, acc => by
+    cases prev <;> simp [WebP.Anim.compose.go, Spec.Anim.compose.go, renderFrame_eq,
       disposeFrame_eq, compose_go_eq]
 
 /-- **In-place canvas assembly computes the specified canvases.** -/
 theorem compose_eq : WebP.Anim.compose = Spec.Anim.compose := by
   funext W H frames
   unfold WebP.Anim.compose Spec.Anim.compose
-  rw [zeros_eq, compose_go_eq]
+  rw [zeros_eq, compose_go_eq]; rfl
 
 end WebP.Proofs

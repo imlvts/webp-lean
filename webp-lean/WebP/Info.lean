@@ -83,6 +83,46 @@ def animFrames (d : ByteArray) : List FrameInfo → Except String (List FrameMet
     return ⟨f.x, f.y, f.width, f.height, f.duration, f.blend, f.dispose, lossy,
       if lossy then f.alph.isSome else hint⟩ :: rest
 
+/-- The metadata of frame `f` whose bitstream header gave the alpha hint `hint`. -/
+def frameMeta (f : FrameInfo) (hint : Bool) : FrameMeta :=
+  let lossy := f.bits.tag == VP8
+  ⟨f.x, f.y, f.width, f.height, f.duration, f.blend, f.dispose, lossy,
+    if lossy then f.alph.isSome else hint⟩
+
+/-- `animFrames` with an accumulator; compiled code uses it (`@[csimp]`, proven equal) so that
+long animations run in constant stack space. -/
+def animFramesTR.go (d : ByteArray) : List FrameInfo → List FrameMeta → Except String (List FrameMeta)
+  | [], acc => .ok acc.reverse
+  | f :: fs, acc =>
+    match bitstreamHeader d f.bits with
+    | .error e => .error e
+    | .ok (w, h, hint) =>
+      if w ≠ f.width ∨ h ≠ f.height then .error "frame bitstream size differs from ANMF size"
+      else go d fs (frameMeta f hint :: acc)
+
+def animFramesTR (d : ByteArray) (fs : List FrameInfo) : Except String (List FrameMeta) :=
+  animFramesTR.go d fs []
+
+theorem animFramesTR_go (d : ByteArray) : ∀ (fs : List FrameInfo) (acc : List FrameMeta),
+    animFramesTR.go d fs acc = (animFrames d fs).map (acc.reverse ++ ·)
+  | [], acc => by simp [animFramesTR.go, animFrames, Except.map]
+  | f :: fs, acc => by
+    simp only [animFramesTR.go, animFrames, bind, Except.bind]
+    cases bitstreamHeader d f.bits with
+    | error e => simp [Except.map]
+    | ok r =>
+      obtain ⟨w, h, hint⟩ := r
+      simp only []
+      split
+      · simp [Except.map, throw, throwThe, MonadExceptOf.throw]
+      · rw [animFramesTR_go d fs]
+        cases animFrames d fs <;> simp [Except.map, pure, Except.pure, frameMeta]
+
+@[csimp] theorem animFrames_eq_animFramesTR : @animFrames = @animFramesTR := by
+  funext d fs
+  rw [animFramesTR, animFramesTR_go]
+  cases animFrames d fs <;> simp [Except.map]
+
 /-- Metadata of a demuxed file (mirrors `Spec.decodeLayout`). -/
 def infoOfLayout (d : ByteArray) : Layout → Except String Info
   | .still vp8x alph bits => do
